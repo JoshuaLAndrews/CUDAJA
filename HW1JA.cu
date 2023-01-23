@@ -1,6 +1,6 @@
 // Solution
 // HW1 DeviceQuery
-// nvcc DeviceQuery.cu -o DeviceQuery
+// nvcc HW1JA.cu -o DeviceQuery
 
 #include <stdio.h>
 
