@@ -51,7 +51,7 @@ void Addition(float *a, float *b, float *c, int n)
 	int i;	
 	for(i=0;i<N;i++)
 	{
-		C_CPU[i]= a[i] + b[i];
+		c[i]= a[i] + b[i];
 	}
 }
 
