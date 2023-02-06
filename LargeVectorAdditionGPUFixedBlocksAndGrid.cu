@@ -1,3 +1,4 @@
+//Joshua Andrews
 // large Vector addition on the GPU with a fixed number of blocks.
 // nvcc LargeVectorAdditionGPUFixedBlocksAndGrid.cu -o LargeVectorAdditionGPUFixedBlocksAndGrid
 
