@@ -1,3 +1,4 @@
+//Joshua Andrews
 // Vector addition on the GPU with as many blocks as needed.
 // nvcc VectorAdditionGPUManyBlock.cu -o VectorAdditionGPUManyBlock
 
