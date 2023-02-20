@@ -45,7 +45,7 @@ void AllocateMemory()
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaMalloc(&B_GPU,N*sizeof(float));
 	myCudaErrorCheck(__FILE__, __LINE__);
-	cudaMalloc(&C_GPU,(N+11)*sizeof(float));
+	cudaMalloc(&C_GPU,(BlockSize.x*GridSize.x)*sizeof(float));
 	myCudaErrorCheck(__FILE__, __LINE__);
 
 	//Allocate Host (CPU) Memory
