@@ -107,6 +107,7 @@ __global__ void DotProductGPU(float *a, float *b, float *DotGPU, int n)
 {
 	int threadNumber = threadIdx.x;
 	int vectorNumber = threadIdx.x + blockDim.x*blockIdx.x;
+	int fold = blockDim.x; 
 	__shared__ float c_sh[BLOCK_SIZE];
 	
 	//***********************************
@@ -117,13 +118,14 @@ __global__ void DotProductGPU(float *a, float *b, float *DotGPU, int n)
 		}
 	__syncthreads();
 		
-	for (int fold = blockDim.x; fold>=2;fold/=2 )
+	while (fold>=2 && threadNumber<fold/2)
 		{
-			if(threadNumber<fold/2 && (vectorNumber+fold/2)<n)
+			fold = fold/2;
+			if(threadNumber<fold && (vectorNumber+fold)<n)
 			{
-				c_sh[threadNumber] += c_sh[threadNumber + fold/2];
+				c_sh[threadNumber] += c_sh[threadNumber + fold];
 			}
-			__syncthreads();
+		__syncthreads();
 		}
 	//***********************************
 	
