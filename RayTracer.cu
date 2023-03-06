@@ -16,7 +16,7 @@
 #define ZMIN -1.0f
 #define ZMAX 1.0f
 
-#define NUMSPHERES 20
+#define NUMSPHERES 2000
 #define INF 1000000
 
 struct sphereStruct 
@@ -29,6 +29,8 @@ struct sphereStruct
 static int Window;
 unsigned int WindowWidth = WINDOWWIDTH;
 unsigned int WindowHeight = WINDOWHEIGHT;
+
+cudaEvent_t Start, Stop;
 
 dim3 BlockSize, GridSize;
 float *PixelsCPU, *PixelsGPU; 
@@ -57,6 +59,16 @@ void KeyPressed(unsigned char key, int x, int y)
 		glutDestroyWindow(Window);
 		printf("\nw Good Bye\n");
 		exit(0);
+		
+		cudaEventDestroy(Start);
+		myCudaErrorCheck(__FILE__, __LINE__);
+		cudaEventDestroy(Stop);
+		myCudaErrorCheck(__FILE__, __LINE__);
+		
+		cudaFree(PixelsGPU);
+		
+		free(PixelsCPU);
+		free(SpheresCPU);
 	}
 }
 
@@ -67,42 +79,7 @@ __device__ float hit(float pixx, float pixy, float *dimingValue, float centerx, 
 	if(dx*dx + dy*dy < radius*radius) // if the ray hits the sphere, then we need to find distance
 	{
 		float dz = sqrtf(radius*radius - dx*dx - dy*dy); // Distance from ray to edge of sphere?
-		if ((dz/radius)<0.2 && (dz/radius)>0.0)
-			{
-				*dimingValue = 1.0;
-			}
-		if ((dz/radius)>0.2 && (dz/radius)<0.4)
-			{
-				*dimingValue = 0.4;
-			}
-		if ((dz/radius)<0.4 && (dz/radius)>0.6)
-			{
-				*dimingValue = 0.8;
-			}
-		if ((dz/radius)>0.6&& (dz/radius)<0.8)
-			{
-				*dimingValue = 0.4;
-			}
-		if ((dz/radius)>0.8 && (dz/radius)<0.9)
-			{
-				*dimingValue = 0.8;
-			}
-		if ((dz/radius)>0.9 && (dz/radius)<0.95)
-			{
-				*dimingValue = 0.2;
-			}
-		if ((dz/radius)>0.95 && (dz/radius)<0.975)
-			{
-				*dimingValue = 0.8;
-			}
-		if ((dz/radius)>0.975 && (dz/radius)<0.98)
-			{
-				*dimingValue = 0.2;
-			}
-		if ((dz/radius)>0.98)
-			{
-				*dimingValue = 0.9;
-			}
+		*dimingValue = dz/radius; // n is value between 0 and 1 used for darkening points near edge.
 		return dz + centerz; //  Return the distance to be scaled by
 	}
 	return (ZMIN- 1.0); //If the ray doesn't hit anything return a number behind the box.
@@ -121,9 +98,9 @@ __global__ void makeSphersBitMap(float *pixels, sphereStruct *sphereInfo)
 	int id = 3*(threadIdx.x + blockIdx.x*blockDim.x);
 	
 	//initialize rgb values for each pixel to zero (black)
-	float pixelr = 0.2f;
-	float pixelg = 0.2f;
-	float pixelb = 0.2f;
+	float pixelr = 0.0f;
+	float pixelg = 0.0f;
+	float pixelb = 0.0f;
 	float hitValue;
 	float dimingValue;
 	float maxHit = ZMIN -1.0f; // Initializing it to be out of the back of the box.
@@ -176,6 +153,18 @@ void makeBitMap()
 	myCudaErrorCheck(__FILE__, __LINE__);
 	
 	paintScreen();
+	
+	cudaEventRecord(Stop, 0);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	cudaEventSynchronize(Stop);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	float time;
+	cudaEventElapsedTime(&time, Start, Stop);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	printf("\n Time on GPU = %3.1f milliseconds", time);
 }
 
 void paintScreen()
@@ -220,6 +209,15 @@ void setup()
 
 int main(int argc, char** argv)
 { 
+	cudaEventCreate(&Start);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	cudaEventCreate(&Stop);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	cudaEventRecord(Start, 0);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
 	setup();
 	makeRandomSpheres();
    	glutInit(&argc, argv);
