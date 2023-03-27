@@ -155,10 +155,12 @@ int main()
 	for(int i = 0; i < ENTIRE_DATA_SET; i += DATA_CHUNKS)
 	{
 		cudaMemcpyAsync(A_GPU, A_CPU+i, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream0);
+		myCudaErrorCheck(__FILE__, __LINE__);
 		cudaMemcpyAsync(B_GPU, B_CPU+i, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream0);
+		myCudaErrorCheck(__FILE__, __LINE__);
 		trigAdditionGPU<<<DATA_CHUNKS/BLOCK_SIZE,BLOCK_SIZE,0,Stream0>>>(A_GPU, B_GPU, C_GPU, DATA_CHUNKS);
 		cudaMemcpyAsync(C_CPU+i, C_GPU, DATA_CHUNKS*sizeof(float), cudaMemcpyDeviceToHost, Stream0);
-		
+		myCudaErrorCheck(__FILE__, __LINE__);
 	}
 	
 	// ??? Notice that we have make the CPU wait until the GPU has finished stream0
