@@ -1,4 +1,4 @@
-// nvcc TwoStreams2.cu -o temp
+// nvcc ThreeStreamsinterweaved.cu -o temp
 
 #include <sys/time.h>
 #include <stdio.h>
@@ -21,9 +21,9 @@ dim3 BlockSize; //This variable will hold the Dimensions of your block
 dim3 GridSize; //This variable will hold the Dimensions of your grid
 float *NumbersOnGPU, *PageableNumbersOnCPU, *PageLockedNumbersOnCPU;
 float *A_CPU, *B_CPU, *C_CPU; //CPU pointers
-float *A0_GPU, *B0_GPU, *C0_GPU, *A1_GPU, *B1_GPU, *C1_GPU; //GPU pointers
+float *A0_GPU, *B0_GPU, *C0_GPU, *A1_GPU, *B1_GPU, *C1_GPU,*A2_GPU, *B2_GPU, *C2_GPU; //GPU pointers
 cudaEvent_t StartEvent, StopEvent;
-cudaStream_t Stream0, Stream1;
+cudaStream_t Stream0, Stream1, Stream2;
 
 //This will be the layout of the parallel space we will be using.
 void setUpCudaDevices()
@@ -53,6 +53,8 @@ void setUpCudaDevices()
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaStreamCreate(&Stream1);
 	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaStreamCreate(&Stream2);
+	myCudaErrorCheck(__FILE__, __LINE__);
 	
 	BlockSize.x = BLOCK_SIZE;
 	BlockSize.y = 1;
@@ -79,11 +81,19 @@ void allocateMemory()
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaMalloc(&C0_GPU,DATA_CHUNKS*sizeof(float));
 	myCudaErrorCheck(__FILE__, __LINE__);
+	
 	cudaMalloc(&A1_GPU,DATA_CHUNKS*sizeof(float));
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaMalloc(&B1_GPU,DATA_CHUNKS*sizeof(float));
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaMalloc(&C1_GPU,DATA_CHUNKS*sizeof(float));
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	cudaMalloc(&A2_GPU,DATA_CHUNKS*sizeof(float));
+	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaMalloc(&B2_GPU,DATA_CHUNKS*sizeof(float));
+	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaMalloc(&C2_GPU,DATA_CHUNKS*sizeof(float));
 	myCudaErrorCheck(__FILE__, __LINE__);
 	
 	//Allocate page locked Host (CPU) Memory
@@ -116,11 +126,19 @@ void cleanUp()
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaFree(C0_GPU); 
 	myCudaErrorCheck(__FILE__, __LINE__);
+	
 	cudaFree(A1_GPU); 
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaFree(B1_GPU); 
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaFree(C1_GPU); 
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	cudaFree(A2_GPU); 
+	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaFree(B2_GPU); 
+	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaFree(C2_GPU); 
 	myCudaErrorCheck(__FILE__, __LINE__);
 	
 	cudaFreeHost(A_CPU);
@@ -138,6 +156,8 @@ void cleanUp()
 	cudaStreamDestroy(Stream0);
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaStreamDestroy(Stream1);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaStreamDestroy(Stream2);
 	myCudaErrorCheck(__FILE__, __LINE__);
 }
 
@@ -162,32 +182,38 @@ int main()
 	cudaEventRecord(StartEvent, 0);
 	myCudaErrorCheck(__FILE__, __LINE__);
 	
-	for(int i = 0; i < ENTIRE_DATA_SET; i += DATA_CHUNKS*2)
+	for(int i = 0; i < ENTIRE_DATA_SET; i += DATA_CHUNKS*3)
 	{
 		//******************************************
 		cudaMemcpyAsync(A0_GPU, A_CPU+i, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream0);
 		myCudaErrorCheck(__FILE__, __LINE__);
-		cudaMemcpyAsync(A1_GPU, A_CPU+i+DATA_CHUNKS, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream1);
-		myCudaErrorCheck(__FILE__, __LINE__);
-		
 		cudaMemcpyAsync(B0_GPU, B_CPU+i, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream0);
+		myCudaErrorCheck(__FILE__, __LINE__);
+		cudaMemcpyAsync(A1_GPU, A_CPU+i+DATA_CHUNKS, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream1);
 		myCudaErrorCheck(__FILE__, __LINE__);
 		cudaMemcpyAsync(B1_GPU, B_CPU+i+DATA_CHUNKS, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream1);
 		myCudaErrorCheck(__FILE__, __LINE__);
-		
+		cudaMemcpyAsync(A2_GPU, A_CPU+i+2*DATA_CHUNKS, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream2);
+		myCudaErrorCheck(__FILE__, __LINE__);
+		cudaMemcpyAsync(B2_GPU, B_CPU+i+2*DATA_CHUNKS, DATA_CHUNKS*sizeof(float), cudaMemcpyHostToDevice, Stream2);
+		myCudaErrorCheck(__FILE__, __LINE__);
 		trigAdditionGPU<<<GridSize,BlockSize,0,Stream0>>>(A0_GPU, B0_GPU, C0_GPU, DATA_CHUNKS);
 		trigAdditionGPU<<<GridSize,BlockSize,0,Stream1>>>(A1_GPU, B1_GPU, C1_GPU, DATA_CHUNKS);
-		
+		trigAdditionGPU<<<GridSize,BlockSize,0,Stream2>>>(A2_GPU, B2_GPU, C2_GPU, DATA_CHUNKS);
 		cudaMemcpyAsync(C_CPU+i, C0_GPU, DATA_CHUNKS*sizeof(float), cudaMemcpyDeviceToHost, Stream0);
 		myCudaErrorCheck(__FILE__, __LINE__);
 		cudaMemcpyAsync(C_CPU+i+DATA_CHUNKS, C1_GPU, DATA_CHUNKS*sizeof(float), cudaMemcpyDeviceToHost, Stream1);
 		myCudaErrorCheck(__FILE__, __LINE__);
+		cudaMemcpyAsync(C_CPU+i+2*DATA_CHUNKS, C2_GPU, DATA_CHUNKS*sizeof(float), cudaMemcpyDeviceToHost, Stream2);
+		myCudaErrorCheck(__FILE__, __LINE__);
+
 		//******************************************
 	}
 	
 	// Make the CPU wait until the Streams have finishd before it continues.
 	cudaStreamSynchronize(Stream0);
 	cudaStreamSynchronize(Stream1);
+	cudaStreamSynchronize(Stream2);
 	
 	cudaEventRecord(StopEvent, 0);
 	myCudaErrorCheck(__FILE__, __LINE__);

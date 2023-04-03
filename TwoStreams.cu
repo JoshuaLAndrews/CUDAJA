@@ -5,7 +5,7 @@
 #include "./MyCuda.h"
 
 #define DATA_CHUNKS (1024*1024) 
-#define ENTIRE_DATA_SET (20*DATA_CHUNKS)
+#define ENTIRE_DATA_SET (24*DATA_CHUNKS)
 #define MAX_RANDOM_NUMBER 1000
 #define BLOCK_SIZE 256
 
