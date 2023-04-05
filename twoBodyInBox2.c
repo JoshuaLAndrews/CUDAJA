@@ -20,7 +20,7 @@
 #define MASS 10.0  	
 #define DIAMETER 1.0
 
-#define SPRING_STRENGTH 5000.0
+#define SPRING_STRENGTH 500.0
 #define SPRING_REDUCTION 0.1
 
 #define DAMP 0.0
@@ -214,7 +214,7 @@ void keep_in_box()
 void get_forces()
 {
 	float dx,dy,dz,r,r2,dvx,dvy,dvz,forceMag,inout;
-	for (int i = 0; i < NUMBER_OF_SPHERES - 1; i++)
+	for (int i = 0; i < NUMBER_OF_SPHERES-1; i++)
 	{
 		for (int j = 0; j < NUMBER_OF_SPHERES; j++)
 		{
@@ -245,9 +245,9 @@ void get_forces()
 			SpheresCPU[i].fx = forceMag*dx/r;
 			SpheresCPU[i].fy = forceMag*dy/r;
 			SpheresCPU[i].fz = forceMag*dz/r;
-			SpheresCPU[j].fx = -forceMag*dx/r;
-			SpheresCPU[j].fy = -forceMag*dy/r;
-			SpheresCPU[j].fz = -forceMag*dz/r;
+			SpheresCPU[j].fx += -forceMag*dx/r;
+			SpheresCPU[j].fy += -forceMag*dy/r;
+			SpheresCPU[j].fz += -forceMag*dz/r;
 			
        	}
        }
@@ -370,4 +370,3 @@ int main(int argc, char** argv)
 	glutMainLoop();
 	return 0;
 }
-
