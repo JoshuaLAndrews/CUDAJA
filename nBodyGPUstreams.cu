@@ -1,6 +1,6 @@
 //Optimized using shared memory and on chip memory	
 //Initail conditions are setup in a cube.																																											
-// nvcc nBodyGPU.cu -o nBodyGPU -lglut -lm -lGLU -lGL
+// nvcc nBodyGPUstreams.cu -o nBodyGPUstreams -lglut -lm -lGLU -lGL
 //To stop hit "control c" in the window you launched it from.
 
 #include <sys/time.h>
@@ -56,6 +56,7 @@ void cleanUp();
 float4 Position[N], Velocity[N], Force[N];
 float4 *PositionGPU, *VelocityGPU, *ForceGPU;
 dim3 Block, Grid;
+cudaStream_t Stream0, Stream1;
 
 void set_initail_conditions()
 {
@@ -86,9 +87,9 @@ void set_initail_conditions()
 				Position[num].x = position_start + i*initail_seperation;
 				Position[num].y = position_start + j*initail_seperation;
 				Position[num].z = position_start + k*initail_seperation;
-				Velocity[num].x = 0.0;
-				Velocity[num].y = 0.0;
-				Velocity[num].z = 0.0;
+				//Velocity[num].x = 0.0;
+				//Velocity[num].y = 0.0;
+				//Velocity[num].z = 0.0;
 				num++;
 			}
 		}
@@ -108,6 +109,11 @@ void setupDevice()
 	cudaMalloc( (void**)&PositionGPU, N *sizeof(float4) );
 	cudaMalloc( (void**)&VelocityGPU, N *sizeof(float4) );
 	cudaMalloc( (void**)&ForceGPU, N *sizeof(float4) );
+	
+	cudaStreamCreate(&Stream0);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaStreamCreate(&Stream1);
+	myCudaErrorCheck(__FILE__, __LINE__);
 	
 	///cudamemset?
 }
@@ -178,17 +184,17 @@ __global__ void getForces(float t, float4 *pos, float4 * force)
 	shPos[threadIdx.x] = pos[threadIdx.x + blockDim.x*j];
 	__syncthreads();
 
-	#pragma unroll 32
-	for(int i=0; i < blockDim.x; i++)	
-	{
-		ii = i + blockDim.x*j;
-		    if(ii != id && ii < N) 
-		    {
-		    	force_mag = getBodyBodyForce(posMe, shPos[i]);
-			forceSum.x += force_mag.x;
-			forceSum.y += force_mag.y;
-			forceSum.z += force_mag.z;
-		    }
+		#pragma unroll 32
+		for(int i=0; i < blockDim.x; i++)	
+		{
+			ii = i + blockDim.x*j;
+			    if(ii != id && ii < N) 
+			    {
+			    	force_mag = getBodyBodyForce(posMe, shPos[i]);
+				forceSum.x += force_mag.x;
+				forceSum.y += force_mag.y;
+				forceSum.z += force_mag.z;
+			    }
 	   	 }
 	}
 	if(id <N)
@@ -210,13 +216,13 @@ __global__ void moveBodies(float time, float4 *pos, float4 *vel, float4 * force)
 			//vel[id].y = VI;///////IDK if this is faster
 			//vel[id].z = VI;
 			
-			vel[id].x += ((force[id].x-DAMP*vel[id].x)/pos[id].w)*0.5*DT; 
-			vel[id].y += ((force[id].y-DAMP*vel[id].y)/pos[id].w)*0.5*DT; //NO CHANGED TEXT
-			vel[id].z += ((force[id].z-DAMP*vel[id].z)/pos[id].w)*0.5*DT;
+			//vel[id].x += ((force[id].x-DAMP*vel[id].x)/pos[id].w)*0.5*DT; 
+			//vel[id].y += ((force[id].y-DAMP*vel[id].y)/pos[id].w)*0.5*DT; //NO CHANGED TEXT
+			//vel[id].z += ((force[id].z-DAMP*vel[id].z)/pos[id].w)*0.5*DT;
 			
-			//vel[id].x += ((force[id].x-DAMP*VIX)/pos[id].w)*0.5*DT;
-			//vel[id].y += ((force[id].y-DAMP*VIY)/pos[id].w)*0.5*DT;
-			//vel[id].z += ((force[id].z-DAMP*VIZ)/pos[id].w)*0.5*DT;
+			vel[id].x += ((force[id].x-DAMP*VIX)/pos[id].w)*0.5*DT;
+			vel[id].y += ((force[id].y-DAMP*VIY)/pos[id].w)*0.5*DT;
+			vel[id].z += ((force[id].z-DAMP*VIZ)/pos[id].w)*0.5*DT;
 		}
 		else
 		{
@@ -231,25 +237,30 @@ __global__ void moveBodies(float time, float4 *pos, float4 *vel, float4 * force)
     }
 }
 
+
 void n_body()
 {
 	int   tdraw = 0; 
 	float time = 0.0;
 	
-    	cudaMemcpy( PositionGPU, Position, N *sizeof(float4), cudaMemcpyHostToDevice );
-    	cudaMemcpy( VelocityGPU, Velocity, N *sizeof(float4), cudaMemcpyHostToDevice );
+	cudaMemcpyAsync( PositionGPU, Position, N *sizeof(float4), cudaMemcpyHostToDevice, Stream0);
+    	cudaMemcpyAsync( VelocityGPU, Velocity, N *sizeof(float4), cudaMemcpyHostToDevice, Stream0);
+		
 	while(time < STOP_TIME)
 	{	
-		getForces<<<Grid, Block>>>(time, PositionGPU, ForceGPU);
-		moveBodies<<<Grid, Block>>>(time, PositionGPU, VelocityGPU, ForceGPU);
-        
+    		
+		getForces<<<Grid, Block,0,Stream0>>>(time, PositionGPU, ForceGPU);
+		moveBodies<<<Grid, Block,0,Stream0>>>(time, PositionGPU, VelocityGPU, ForceGPU);
+             	
+        	
 		if(tdraw == DRAW) 
 		{
-			cudaMemcpy( Position, PositionGPU, N *sizeof(float4), cudaMemcpyDeviceToHost );
+			cudaMemcpyAsync( Position, PositionGPU, N *sizeof(float4), cudaMemcpyDeviceToHost, Stream1);
 			draw_picture();
 			printf("\n Time = %f \n", time);
 			tdraw = 0;
 		}
+		
 		time += DT;
 		tdraw++;
 	}
@@ -303,6 +314,11 @@ void cleanUp()
 	cudaFree(VelocityGPU); 
 	myCudaErrorCheck(__FILE__, __LINE__);
 	cudaFree(ForceGPU); 
+	myCudaErrorCheck(__FILE__, __LINE__);
+	
+	cudaStreamDestroy(Stream0);
+	myCudaErrorCheck(__FILE__, __LINE__);
+	cudaStreamDestroy(Stream1);
 	myCudaErrorCheck(__FILE__, __LINE__);
 	
 }

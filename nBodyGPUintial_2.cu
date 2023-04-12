@@ -1,6 +1,6 @@
 //Optimized using shared memory and on chip memory	
 //Initail conditions are setup in a cube.																																											
-// nvcc nBodyGPU.cu -o nBodyGPU -lglut -lm -lGLU -lGL
+// nvcc nBodyGPU2_2.cu -o nBodyGPU2_2 -lglut -lm -lGLU -lGL
 //To stop hit "control c" in the window you launched it from.
 
 #include <sys/time.h>
@@ -59,7 +59,7 @@ dim3 Block, Grid;
 
 void set_initail_conditions()
 {
-	int i,j,k,num,particles_per_side;
+	int num,particles_per_side;
 	float position_start, temp;
 	float initail_seperation;
 
@@ -73,25 +73,15 @@ void set_initail_conditions()
 //		Position[i].w = 1.0;  ///Too slow
 //	}
 
-	printf("%.15f\n",position_start);
-	
-	num = 0;
-	for(i=0; i<particles_per_side; i++)
+	#pragma unroll 32
+	for(num = 0; num < N; num++)
 	{
-		for(j=0; j<particles_per_side; j++)
-		{
-			for(k=0; k<particles_per_side; k++)
-			{
-			    if(N <= num) break;
-				Position[num].x = position_start + i*initail_seperation;
-				Position[num].y = position_start + j*initail_seperation;
-				Position[num].z = position_start + k*initail_seperation;
-				Velocity[num].x = 0.0;
-				Velocity[num].y = 0.0;
-				Velocity[num].z = 0.0;
-				num++;
-			}
-		}
+		Position[num].x = position_start + (num/(particles_per_side*particles_per_side))*initail_seperation;
+		Position[num].y = position_start + ((num/particles_per_side)%particles_per_side)*initail_seperation;
+		Position[num].z = position_start + (num%particles_per_side)*initail_seperation;
+		Velocity[num].x = 0.0;
+		Velocity[num].y = 0.0;
+		Velocity[num].z = 0.0;
 	}
 }
 

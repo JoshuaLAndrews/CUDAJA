@@ -1,6 +1,6 @@
 //Optimized using shared memory and on chip memory	
 //Initail conditions are setup in a cube.																																											
-// nvcc nBodyGPU.cu -o nBodyGPU -lglut -lm -lGLU -lGL
+// nvcc nBodyGPU2.cu -o nBodyGPU2 -lglut -lm -lGLU -lGL
 //To stop hit "control c" in the window you launched it from.
 
 #include <sys/time.h>
@@ -13,12 +13,12 @@
 
 #define BLOCK_SIZE 256
 
-#define N 400
+#define N 8000
 
 #define XWindowSize 1000
 #define YWindowSize 1000
 
-#define DRAW 10
+#define DRAW 1000
 #define DAMP 0.5
 
 #define DT 0.001
@@ -39,7 +39,7 @@
 
 
 //Function prototypes
-void set_initail_conditions();
+__global__ void set_initail_conditions(float4 *, float4 *);
 void setupDevice();
 void draw_picture();
 __device__ float4 getBodyBodyForce(float4 *, float4 *);
@@ -57,9 +57,11 @@ float4 Position[N], Velocity[N], Force[N];
 float4 *PositionGPU, *VelocityGPU, *ForceGPU;
 dim3 Block, Grid;
 
-void set_initail_conditions()
+
+__global__ void set_initail_conditions(float4 *ipos, float4 *ivel)
 {
-	int i,j,k,num,particles_per_side;
+	int id = blockIdx.x *blockDim.x + threadIdx.x;
+	int particles_per_side;
 	float position_start, temp;
 	float initail_seperation;
 
@@ -68,32 +70,17 @@ void set_initail_conditions()
     	position_start = -(particles_per_side -1.0)/2.0;
 	initail_seperation = 2.0;
 	
-//	for(i=0; i<N; i++)
-//	{
-//		Position[i].w = 1.0;  ///Too slow
-//	}
-
-	printf("%.15f\n",position_start);
-	
-	num = 0;
-	for(i=0; i<particles_per_side; i++)
+	if(id < N)
 	{
-		for(j=0; j<particles_per_side; j++)
-		{
-			for(k=0; k<particles_per_side; k++)
-			{
-			    if(N <= num) break;
-				Position[num].x = position_start + i*initail_seperation;
-				Position[num].y = position_start + j*initail_seperation;
-				Position[num].z = position_start + k*initail_seperation;
-				Velocity[num].x = 0.0;
-				Velocity[num].y = 0.0;
-				Velocity[num].z = 0.0;
-				num++;
-			}
-		}
+		ipos[id].x = position_start + (id/(particles_per_side*particles_per_side))*initail_seperation;
+		ipos[id].y = position_start + ((id/particles_per_side)%particles_per_side)*initail_seperation;
+		ipos[id].z = position_start + (id%particles_per_side)*initail_seperation;
+		ivel[id].x= 0.0;
+		ivel[id].y = 0.0;
+		ivel[id].z = 0.0;
 	}
 }
+
 
 void setupDevice()
 {
@@ -236,8 +223,8 @@ void n_body()
 	int   tdraw = 0; 
 	float time = 0.0;
 	
-    	cudaMemcpy( PositionGPU, Position, N *sizeof(float4), cudaMemcpyHostToDevice );
-    	cudaMemcpy( VelocityGPU, Velocity, N *sizeof(float4), cudaMemcpyHostToDevice );
+   // 	cudaMemcpy( PositionGPU, Position, N *sizeof(float4), cudaMemcpyHostToDevice );
+    //	cudaMemcpy( VelocityGPU, Velocity, N *sizeof(float4), cudaMemcpyHostToDevice );
 	while(time < STOP_TIME)
 	{	
 		getForces<<<Grid, Block>>>(time, PositionGPU, ForceGPU);
@@ -260,8 +247,11 @@ void control()
 	timeval start, end;
 	double totalRunTime;
 	
-	set_initail_conditions();
 	setupDevice();
+	
+	set_initail_conditions<<<Grid, Block>>>(PositionGPU,VelocityGPU);
+
+	cudaMemcpy( Position, PositionGPU, N *sizeof(float4), cudaMemcpyDeviceToHost );
 	draw_picture();
 	
 	gettimeofday(&start, NULL);
@@ -313,7 +303,7 @@ int main(int argc, char** argv)
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH | GLUT_RGB);
 	glutInitWindowSize(XWindowSize,YWindowSize);
 	glutInitWindowPosition(0,0);
-	glutCreateWindow("n Body GPU");
+	glutCreateWindow("n Body GPU 2");
 	GLfloat light_position[] = {1.0, 1.0, 1.0, 0.0};
 	GLfloat light_ambient[]  = {0.0, 0.0, 0.0, 1.0};
 	GLfloat light_diffuse[]  = {1.0, 1.0, 1.0, 1.0};
