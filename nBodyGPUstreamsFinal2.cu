@@ -1,6 +1,6 @@
 //Optimized using shared memory and on chip memory	
 //Initail conditions are setup in a cube.																																											
-// nvcc nBodyGPUstreamsFinal.cu -o nBodyGPUstreamsFinal -lglut -lm -lGLU -lGL
+// nvcc nBodyGPUstreamsFinal2.cu -o nBodyGPUstreamsFinal2 -lglut -lm -lGLU -lGL
 //To stop hit "control c" in the window you launched it from.
 
 #include <sys/time.h>
@@ -260,7 +260,7 @@ void n_body()
 		if(tdraw == DRAW) 
 		{
 			//cudaStreamSynchronize(Stream1);
-			cudaMemcpyAsync( Position, PositionGPU, N *sizeof(float4), cudaMemcpyDeviceToHost, Stream1);
+			cudaMemcpy( Position, PositionGPU, N *sizeof(float4), cudaMemcpyDeviceToHost);
 			draw_picture();
 			printf("\n Time = %f \n", time);
 			tdraw = 0;
